@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const OTPRoutes = require('./otpRoutes');
 const GenericRoute = require('./CRUD');  // Import the generic POST route
 
 const app = express();
@@ -18,10 +20,12 @@ mongoose.connect(`mongodb+srv://groupprojectapple:SamarahaisGreat%402025@cluster
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-// Use the Generic Post Route
+app.use('/api/otp', OTPRoutes)// this sets the base URL for all otp service routes
 app.use('/api', GenericRoute);  // This sets the base URL for all generic POST routes
 
 // Start the Server
+//console.log(process.env.GMAIL_USER);
+//console.log(process.env.GMAIL_PASS);
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });
