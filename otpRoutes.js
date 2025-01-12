@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const OTPModel = require('./models/OTPModel'); // Import OTP model
-
+const USermodel = require('./models/usermodel');
 const router = express.Router();
 
 // Configure nodemailer for sending OTP via email
@@ -57,6 +57,10 @@ router.post('/send-otp', async (req, res) => {
     if (!identifier) {
         return res.status(400).json({ message: "Identifier (email/phone) is required" });
     }
+    const user = await USermodel.findOne({ email: identifier });
+    if(!user){
+        return res.status(404).json({ message: "This email is is not registered.Re-enter the correct email or sign-up" });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000); // Generate a 6-digit OTP
 
@@ -76,26 +80,45 @@ router.post('/send-otp', async (req, res) => {
 // Verify OTP route
 router.post('/verify-otp', async (req, res) => {
     const { identifier, otp } = req.body;
-
+    console.log("in /verify-otp");
+    console.log("Received identifier:", identifier);
+    console.log("Received OTP:", otp);
     if (!identifier || !otp) {
         return res.status(400).json({ message: "Identifier and OTP are required" });
+        console.log("Identifier and OTP are required");
     }
 
     try {
-        // Find OTP record in the database
-        const record = await OTPModel.findOne({ identifier });
-
+        // Find the OTP record
+        const record = await OTPModel.findOne({ identifier }).sort({ createdAt: -1 });
+        console.log("OTP Record found:", record);
+        console.log("Received OTP:", otp);
+        console.log("Stored OTP:", record.otp);
         if (!record || record.otp !== otp) {
+            console.log("Invalid or expired OTP");
             return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
-        // Delete OTP after successful verification
+        // Access the users collection directly
+        console.log("Looking for user with email:", identifier);
+        const user = await USermodel.findOne({ email: identifier });
+        console.log("User found:", user);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Delete the OTP record after successful verification
         await OTPModel.deleteOne({ identifier });
 
-        // Generate a token (optional, if you want to use JWT)
-        const token = jwt.sign({ identifier }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        res.status(200).json({ message: "OTP verified successfully", token });
+        // Respond with user details
+        res.status(200).json({
+            message: "OTP verified successfully",
+            user: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+            },
+        });
     } catch (error) {
         res.status(500).json({ message: "Error verifying OTP", error });
     }
